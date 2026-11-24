@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "registers.h"
+#include <iostream>
 
 CPU::CPU(Memory &memory) : memory(memory) {}
 
@@ -26,7 +27,6 @@ bool CPU::step() {
     uint8_t cbInstruction = fetch8();
 
     switch (cbInstruction) {
-    // CB-prefixed instructions go here.
     default:
       std::cerr << "Unknown CB instruction: 0x" << std::hex
                 << (int)cbInstruction << '\n';
@@ -35,6 +35,17 @@ bool CPU::step() {
 
     return false;
   }
+
+  // std::cout << instruction;
+
+  uint16_t previousPC = registers.pc;
+
+  std::cout << "PC: 0x" << std::hex << previousPC << " | OP: 0x"
+            << (int)instruction << " | A: 0x" << (int)registers.a << " | F: 0x"
+            << (int)registers.f << '\n';
+
+  std::cout << std::hex << "PC: 0x" << registers.pc - 1 << " OP: 0x"
+            << (int)instruction << '\n';
 
   switch (instruction) {
 
@@ -95,7 +106,7 @@ bool CPU::step() {
     break;
   }
 
-  case 0x0D: { // DEC B
+  case 0x0D: { // DEC C
     uint8_t result = registers.c - 1;
 
     registers.f &= FLAG_C; // Preserve carry flag
@@ -138,8 +149,8 @@ bool CPU::step() {
   }
 
   case 0xF0: { // LDH A, (a8)
-    uint8_t value = fetch8();
-    memory.write(0xFF00 + registers.a, value);
+    uint8_t offset = fetch8();
+    registers.a = memory.read(0xFF00 + offset);
     break;
   }
 

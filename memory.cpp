@@ -49,6 +49,10 @@ uint8_t Memory::read(uint16_t address) {
     return 0xFF;
   }
 
+  if (address == 0xFF44) {
+    return ly;
+  }
+
   return data[address];
 }
 
