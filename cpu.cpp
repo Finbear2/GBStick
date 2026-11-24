@@ -38,15 +38,6 @@ bool CPU::step() {
 
   // std::cout << instruction;
 
-  uint16_t previousPC = registers.pc;
-
-  std::cout << "PC: 0x" << std::hex << previousPC << " | OP: 0x"
-            << (int)instruction << " | A: 0x" << (int)registers.a << " | F: 0x"
-            << (int)registers.f << '\n';
-
-  std::cout << std::hex << "PC: 0x" << registers.pc - 1 << " OP: 0x"
-            << (int)instruction << '\n';
-
   switch (instruction) {
 
   case 0x00: // NOP
@@ -183,6 +174,8 @@ bool CPU::step() {
               << '\n';
     return false;
   }
+
+  memory.updateGraphics();
 
   return true;
 }

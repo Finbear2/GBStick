@@ -66,5 +66,12 @@ void Memory::write(uint16_t address, uint8_t value) {
   }
 
   data[address] = value;
+}
 
+void Memory::updateGraphics() {
+  ly++;
+
+  if (ly > 153) {
+    ly = 0;
+  }
 }
