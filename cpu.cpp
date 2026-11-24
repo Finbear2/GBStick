@@ -168,6 +168,122 @@ bool CPU::step() {
 
     break;
   }
+    
+  case 0x36: { // LD (HL), d8
+    uint8_t value = fetch8();
+    memory.write(registers.hl, value);
+    break;
+  }
+
+  case 0x22: { // LD (HL+), A
+    memory.write(registers.hl, registers.a);
+    registers.hl++;
+    break;
+  }
+
+  case 0x77: { // LD (HL), A
+    memory.write(registers.hl, registers.a);
+    break;
+  }
+
+  case 0x31: { // LD SP, d16
+    registers.sp = fetch16();
+    break;
+  }
+
+  case 0x2A: { // LD A, (HL+)
+    registers.a = memory.read(registers.hl);
+    registers.hl++;
+    break;
+  }
+
+  case 0xE2: { // LDH (C), A
+    memory.write(0xFF00 + registers.c, registers.a);
+    break;
+  }
+
+  case 0x0C: { // INC C
+    uint8_t result = registers.c + 1;
+
+    registers.f &= FLAG_C; // Preserve carry
+    if (result == 0)
+      registers.f |= FLAG_Z;
+    if ((registers.c & 0x0F) == 0x0F)
+      registers.f |= FLAG_H;
+
+    registers.c = result;
+    break;
+  }
+
+  case 0xCD: { // CALL a16
+    uint16_t address = fetch16();
+
+    registers.sp--;
+    memory.write(registers.sp, (registers.pc >> 8) & 0xFF);
+
+    registers.sp--;
+    memory.write(registers.sp, registers.pc & 0xFF);
+
+    registers.pc = address;
+    break;
+  }
+
+  case 0x01: { // LD BC, d16
+    registers.bc = fetch16();
+    break;
+  }
+
+  case 0x0B: { // DEC BC
+    registers.bc--;
+    break;
+  }
+
+  case 0x78: { // LD A B
+    registers.a = registers.b;
+    break;
+  }
+
+  case 0xB1: { // OR C
+    registers.a |= registers.c;
+
+    registers.f = 0; // Clear all flags
+    if (registers.a == 0)
+      registers.f |= FLAG_Z;
+
+    break;
+  }
+
+  case 0xC9: { // RET
+    uint8_t low = memory.read(registers.sp);
+    registers.sp++;
+
+    uint8_t high = memory.read(registers.sp);
+    registers.sp++;
+
+    registers.pc = (high << 8) | low;
+    break;
+  }
+
+  case 0x11: { // LD DE (n16)
+    registers.de = fetch16();
+    break;
+  }
+
+  case 0x12: { // LD (DE) A
+    memory.write(registers.de, registers.a);
+    break;
+  }
+
+  case 0x13: { // INC DE
+    registers.de++;
+    break;
+  }
+
+  case 0xFA: { // LD A, (a16)
+    uint16_t address = fetch16();
+    registers.a = memory.read(address);
+    break;
+  }
 
   default:
     std::cerr << "Unknown instruction: 0x" << std::hex << (int)instruction
