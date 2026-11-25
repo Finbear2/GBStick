@@ -21,6 +21,13 @@ uint16_t CPU::fetch16() {
 
 bool CPU::step() {
 
+  cycles++;
+  targetCycles--;
+
+  if (targetCycles > 0) {
+    return true;
+  }
+
   uint8_t instruction = fetch8();
 
   if (instruction == 0xCB) {
@@ -41,6 +48,53 @@ bool CPU::step() {
   switch (instruction) {
 
   case 0x00: // NOP
+    targetCycles = 4;
+    break;
+
+  case 0x01: // LD BC n16
+    targetCycles = 12;
+    registers.bc = fetch16();
+    break;
+
+  case 0x02: // LD BC A
+    targetCycles = 8;
+    memory.write(registers.bc, registers.a);
+    break;
+
+  case 0x03: // INC BC
+    targetCycles = 8;
+    registers.bc++;
+    break;
+
+  case 0x04: // INC B
+    targetCycles = 4;
+    uint8_t result = registers.b + 1;
+
+    registers.f &= FLAG_C; // Preserve carry
+    if (result == 0)
+      registers.f |= FLAG_Z;
+    if ((registers.b & 0x0F) == 0x0F)
+      registers.f |= FLAG_H;
+
+    registers.b = result;
+    break;
+
+  case 0x05: // DEC B
+    targetCycles = 4;
+    result = registers.b - 1;
+
+    registers.f &= FLAG_C; // Preserve carry flag
+    registers.f |= FLAG_N; // Set subtract flag
+
+    if (result == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    if ((registers.b & 0x0F) == 0) {
+      registers.f |= FLAG_H;
+    }
+
+    registers.b = result;
     break;
 
   case 0x3E: // LD A, d8
@@ -79,23 +133,7 @@ bool CPU::step() {
     break;
   }
 
-  case 0x05: { // DEC B
-    uint8_t result = registers.b - 1;
 
-    registers.f &= FLAG_C; // Preserve carry flag
-    registers.f |= FLAG_N; // Set subtract flag
-
-    if (result == 0) {
-      registers.f |= FLAG_Z;
-    }
-
-    if ((registers.b & 0x0F) == 0) {
-      registers.f |= FLAG_H;
-    }
-
-    registers.b = result;
-    break;
-  }
 
   case 0x0D: { // DEC C
     uint8_t result = registers.c - 1;
@@ -228,11 +266,6 @@ bool CPU::step() {
     break;
   }
 
-  case 0x01: { // LD BC, d16
-    registers.bc = fetch16();
-    break;
-  }
-
   case 0x0B: { // DEC BC
     registers.bc--;
     break;
@@ -284,6 +317,46 @@ bool CPU::step() {
     registers.a = memory.read(address);
     break;
   }
+
+  case 0xA7: { // AND A
+    registers.a &= registers.a;
+
+    registers.f = FLAG_H; // H is always set
+    if (registers.a == 0)
+      registers.f |= FLAG_Z;
+
+    break;
+  }
+
+  case 0x28: { // JR Z, r8
+    int8_t offset = static_cast<int8_t>(fetch8());
+
+    if (registers.f & FLAG_Z) {
+      registers.pc += offset;
+    }
+
+    break;
+  }
+
+  case 0xC0: { // RET NZ
+    if (!(registers.f & FLAG_Z)) {
+      uint8_t low = memory.read(registers.sp++);
+      uint8_t high = memory.read(registers.sp++);
+
+      registers.pc = (high << 8) | low;
+    }
+
+    break;
+  }
+
+  case 0x2F: { // CPL
+    registers.a = ~registers.a;
+
+    registers.f |= FLAG_N | FLAG_H; // Set N and H, preserve Z and C
+    break;
+  }
+
+  
 
   default:
     std::cerr << "Unknown instruction: 0x" << std::hex << (int)instruction

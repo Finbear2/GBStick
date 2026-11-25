@@ -14,6 +14,8 @@ public:
 private:
   Memory &memory;
   bool ime = false;
+  int cycles = 0;
+  int targetCycles = 0;
 
   uint8_t fetch8();
   uint16_t fetch16();
