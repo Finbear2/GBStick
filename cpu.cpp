@@ -48,6 +48,8 @@ bool CPU::step() {
 
   switch (instruction) {
 
+  // 0x00 - 0x0F
+
   case 0x00: { // NOP
     targetCycles = 4;
     break;
@@ -210,9 +212,176 @@ bool CPU::step() {
     break;
   }
 
+  // 0x10 - 0x1F
+
   case 0x10: { // STOP
+    targetCycles = 4;
     fetch8();  // Consume the mandatory second byte
     stopped = true;
+    break;
+  }
+
+  case 0x11: { // LD DE n16
+    targetCycles = 12;
+    registers.de = fetch16();
+    break;
+  }
+
+  case 0x12: { // LD DE A
+    targetCycles = 8;
+    memory.write(registers.de, registers.a);
+    break;
+  }
+
+  case 0x13: { // INC DE
+    targetCycles = 8;
+    registers.de++;
+    break;
+  }
+
+  case 0x14: { // INC D
+    targetCycles = 4;
+    uint8_t result = registers.d + 1;
+
+    registers.f &= FLAG_C; // Preserve carry
+    if (result == 0)
+      registers.f |= FLAG_Z;
+    if ((registers.d & 0x0F) == 0x0F)
+      registers.f |= FLAG_H;
+
+    registers.d = result;
+    break;
+  }
+
+  case 0x15: { // DEC D
+    targetCycles = 4;
+    uint8_t result = registers.d - 1;
+
+    registers.f &= FLAG_C; // Preserve carry
+    registers.f |= FLAG_N; // Set subtract flag
+
+    if (result == 0)
+      registers.f |= FLAG_Z;
+    if ((registers.d & 0x0F) == 0)
+      registers.f |= FLAG_H;
+
+    registers.d = result;
+    break;
+  }
+
+  case 0x16: { // LD D n8
+    targetCycles = 8;
+    registers.d = fetch8();
+    break;
+  }
+
+  case 0x17: { // RLA
+    targetCycles = 4;
+    uint8_t oldCarry = (registers.f & FLAG_C) ? 1 : 0;
+    uint8_t newCarry = (registers.a >> 7) & 1;
+
+    registers.a = (registers.a << 1) | oldCarry;
+
+    registers.f = 0;
+    if (newCarry)
+      registers.f |= FLAG_C;
+
+    break;
+  }
+
+  case 0x18: { // JR r8
+    targetCycles = 12;
+    int8_t offset = static_cast<int8_t>(fetch8());
+    registers.pc += offset;
+    break;
+  }
+
+  case 0x19: { // ADD HL, DE
+    targetCycles = 8;
+    uint32_t result = registers.hl + registers.de;
+
+    registers.f &= FLAG_Z; // Preserve Z, clear N, H and C
+
+    if ((registers.hl & 0x0FFF) + (registers.de & 0x0FFF) > 0x0FFF) {
+      registers.f |= FLAG_H;
+    }
+
+    if (result > 0xFFFF) {
+      registers.f |= FLAG_C;
+    }
+
+    registers.hl = static_cast<uint16_t>(result);
+    break;
+  }
+
+  case 0x1A: { // LD A DE
+    targetCycles = 8;
+    registers.a = memory.read(registers.de);
+    break;
+  }
+
+  case 0x1B: { // DEC DE
+    targetCycles = 8;
+    registers.de--;
+    break;
+  }
+
+  case 0x1C: { // INC E
+    targetCycles = 4;
+    uint8_t result = registers.e + 1;
+
+    registers.f &= FLAG_C; // Preserve carry, clear the other flags
+
+    if (result == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    if ((registers.e & 0x0F) == 0x0F) {
+      registers.f |= FLAG_H;
+    }
+
+    registers.e = result;
+    break;
+  }
+
+  case 0x1D: { // DEC E
+    targetCycles = 4;
+    uint8_t result = registers.e - 1;
+
+    registers.f &= FLAG_C; // Preserve carry, clear everything else
+    registers.f |= FLAG_N; // DEC always sets N
+
+    if (result == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    if ((registers.e & 0x0F) == 0) {
+      registers.f |= FLAG_H;
+    }
+
+    registers.e = result;
+    break;
+  }
+
+  case 0x1E: { // LD E n8
+    targetCycles = 8;
+    registers.e = fetch8();
+    break;
+  }
+
+  case 0x1F: { // RRA
+    targetCycles = 4;
+    uint8_t oldCarry = (registers.f & FLAG_C) ? 1 : 0;
+    uint8_t newCarry = registers.a & 1;
+
+    registers.a = (registers.a >> 1) | (oldCarry << 7);
+
+    registers.f = 0; // RRA always resets Z, N and H
+
+    if (newCarry) {
+      registers.f |= FLAG_C;
+    }
+
     break;
   }
 
@@ -367,21 +536,6 @@ bool CPU::step() {
     registers.sp++;
 
     registers.pc = (high << 8) | low;
-    break;
-  }
-
-  case 0x11: { // LD DE (n16)
-    registers.de = fetch16();
-    break;
-  }
-
-  case 0x12: { // LD (DE) A
-    memory.write(registers.de, registers.a);
-    break;
-  }
-
-  case 0x13: { // INC DE
-    registers.de++;
     break;
   }
 
