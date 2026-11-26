@@ -25,7 +25,7 @@ bool CPU::step() {
   cycles++;
   targetCycles--;
 
-  if (targetCycles > 0) {
+  if (targetCycles > 0 or stopped) {
     return true;
   }
 
@@ -207,6 +207,12 @@ bool CPU::step() {
     if (bit0)
       registers.f |= FLAG_C;
 
+    break;
+  }
+
+  case 0x10: { // STOP
+    fetch8();  // Consume the mandatory second byte
+    stopped = true;
     break;
   }
 

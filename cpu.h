@@ -16,6 +16,7 @@ private:
   bool ime = false;
   int cycles = 0;
   int targetCycles = 0;
+  bool stopped = false;
 
   uint8_t fetch8();
   uint16_t fetch16();
