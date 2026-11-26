@@ -1,5 +1,6 @@
 #include "cpu.h"
 #include "registers.h"
+#include <cstdint>
 #include <iostream>
 
 CPU::CPU(Memory &memory) : memory(memory) {}
@@ -47,26 +48,30 @@ bool CPU::step() {
 
   switch (instruction) {
 
-  case 0x00: // NOP
+  case 0x00: { // NOP
     targetCycles = 4;
     break;
+  }
 
-  case 0x01: // LD BC n16
+  case 0x01: { // LD BC n16
     targetCycles = 12;
     registers.bc = fetch16();
     break;
+  }
 
-  case 0x02: // LD BC A
+  case 0x02: { // LD BC A
     targetCycles = 8;
     memory.write(registers.bc, registers.a);
     break;
+  }
 
-  case 0x03: // INC BC
+  case 0x03: { // INC BC
     targetCycles = 8;
     registers.bc++;
     break;
+  }
 
-  case 0x04: // INC B
+  case 0x04: { // INC B
     targetCycles = 4;
     uint8_t result = registers.b + 1;
 
@@ -78,10 +83,11 @@ bool CPU::step() {
 
     registers.b = result;
     break;
+  }
 
-  case 0x05: // DEC B
+  case 0x05: { // DEC B
     targetCycles = 4;
-    result = registers.b - 1;
+    uint8_t result = registers.b - 1;
 
     registers.f &= FLAG_C; // Preserve carry flag
     registers.f |= FLAG_N; // Set subtract flag
@@ -96,14 +102,17 @@ bool CPU::step() {
 
     registers.b = result;
     break;
+  }
 
-  case 0x3E: // LD A, d8
+  case 0x3E: { // LD A, d8
     registers.a = fetch8();
     break;
+  }
 
-  case 0x06: // LD B, d8
+  case 0x06: { // LD B, d8
     registers.b = fetch8();
     break;
+  }
 
   case 0xC3: { // JP a16
     uint16_t address = fetch16();
