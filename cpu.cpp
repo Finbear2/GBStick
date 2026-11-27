@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "memory.h"
 #include "registers.h"
 #include <cstdint>
 #include <iostream>
@@ -385,6 +386,208 @@ bool CPU::step() {
     break;
   }
 
+  // 0x20 - 0x2F
+
+  case 0x20: { // JR NZ, r8
+    int8_t offset = static_cast<int8_t>(fetch8());
+
+    if (!(registers.f & FLAG_Z)) {
+      registers.pc += offset;
+      targetCycles = 12;
+    } else {
+      targetCycles = 8;
+    }
+
+    break;
+  }
+
+  case 0x21: { // LD HL n16
+    targetCycles = 12;
+    registers.hl = fetch16();
+    break;
+  }
+
+  case 0x22: { // LD HL A
+    targetCycles = 8;
+    memory.write(registers.hl, registers.a);
+    break;
+  }
+
+  case 0x23: { // INC HL
+    targetCycles = 8;
+    registers.hl++;
+    break;
+  }
+
+  case 0x24: { // INC H
+    targetCycles = 4;
+    uint8_t result = registers.h + 1;
+
+    registers.f &= FLAG_C;
+
+    if (result == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    if ((registers.h & 0x0F) == 0x0F) {
+      registers.f |= FLAG_H;
+    }
+
+    registers.h = result;
+    break;
+  }
+
+  case 0x25: { // DEC H
+    targetCycles = 4;
+    uint8_t result = registers.h - 1;
+
+    registers.f &= FLAG_C;
+    registers.f |= FLAG_N;
+
+    if (result == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    if ((registers.h & 0x0F) == 0) {
+      registers.f |= FLAG_H;
+    }
+
+    registers.h = result;
+    break;
+  }
+
+  case 0x26: { // LD H n8
+    targetCycles = 8;
+    registers.h = fetch8();
+    break;
+  }
+
+  case 0x27: { // DAA
+    targetCycles = 4;
+    uint8_t correction = 0;
+
+    if (registers.f & FLAG_H ||
+        (!(registers.f & FLAG_N) && (registers.a & 0x0F) > 9)) {
+      correction |= 0x06;
+    }
+
+    if (registers.f & FLAG_C ||
+        (!(registers.f & FLAG_N) && registers.a > 0x99)) {
+      correction |= 0x60;
+      registers.f |= FLAG_C;
+    }
+
+    if (registers.f & FLAG_N) {
+      registers.a -= correction;
+    } else {
+      registers.a += correction;
+    }
+
+    registers.f &= FLAG_N | FLAG_C;
+
+    if (registers.a == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    break;
+  }
+
+  case 0x28: { // JR Z, r8
+    targetCycles = 8;
+
+    int8_t offset = static_cast<int8_t>(fetch8());
+
+    if (registers.f & FLAG_Z) {
+      registers.pc += offset;
+      targetCycles = 12;
+    }
+
+    break;
+  }
+
+  case 0x29: { // ADD HL, HL
+    targetCycles = 8;
+    uint32_t result = registers.hl + registers.hl;
+
+    registers.f &= FLAG_Z; // Preserve Z, clear N, H and C
+
+    // Half-carry: did the lower 12 bits overflow?
+    if ((registers.hl & 0x0FFF) + (registers.hl & 0x0FFF) > 0x0FFF) {
+      registers.f |= FLAG_H;
+    }
+
+    // Carry: did the result exceed 16 bits?
+    if (result > 0xFFFF) {
+      registers.f |= FLAG_C;
+    }
+
+    registers.hl = static_cast<uint16_t>(result);
+
+    break;
+  }
+
+  case 0x2A: { // LD A HL
+    targetCycles = 8;
+    registers.a = memory.read(registers.hl);
+    break;
+  }
+
+  case 0x2B: { // DEC HL
+    targetCycles = 8;
+    registers.hl--;
+    break;
+  }
+
+  case 0x2C: { // INC L
+    targetCycles = 4;
+    uint8_t result = registers.l + 1;
+
+    registers.f &= FLAG_C;
+
+    if (result == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    if ((registers.l & 0x0F) == 0x0F) {
+      registers.f |= FLAG_H;
+    }
+
+    registers.l = result;
+    break;
+  }
+
+  case 0x2D: { // DEC L
+    targetCycles = 4;
+    uint8_t result = registers.l - 1;
+
+    registers.f &= FLAG_C;
+    registers.f |= FLAG_N;
+
+    if (result == 0) {
+      registers.f |= FLAG_Z;
+    }
+
+    if ((registers.l & 0x0F) == 0) {
+      registers.f |= FLAG_H;
+    }
+
+    registers.l = result;
+    break;
+  }
+
+  case 0x2E: { // LD L n8
+    targetCycles = 8;
+    registers.l = fetch8();
+    break;
+  }
+
+  case 0x2F: { // CPL
+    targetCycles = 4;
+    registers.a = ~registers.a;
+    registers.f |= FLAG_N | FLAG_H;
+    break;
+  }
+
   case 0x3E: { // LD A, d8
     registers.a = fetch8();
     break;
@@ -402,11 +605,6 @@ bool CPU::step() {
     break;
   }
 
-  case 0x21: { // LD HL n16
-    registers.hl = fetch16();
-    break;
-  }
-
   case 0x32: { // LD (HL-) A
     memory.write(registers.hl, registers.a);
     registers.hl--;
@@ -420,14 +618,6 @@ bool CPU::step() {
 
   case 0xFB: { // EI
     ime = true;
-    break;
-  }
-
-  case 0x20: { // JR NZ, r8
-    int8_t offset = static_cast<int8_t>(fetch8());
-    if (!(registers.f & FLAG_Z)) {
-      registers.pc += offset;
-    }
     break;
   }
 
@@ -473,12 +663,6 @@ bool CPU::step() {
     break;
   }
 
-  case 0x22: { // LD (HL+), A
-    memory.write(registers.hl, registers.a);
-    registers.hl++;
-    break;
-  }
-
   case 0x77: { // LD (HL), A
     memory.write(registers.hl, registers.a);
     break;
@@ -486,12 +670,6 @@ bool CPU::step() {
 
   case 0x31: { // LD SP, d16
     registers.sp = fetch16();
-    break;
-  }
-
-  case 0x2A: { // LD A, (HL+)
-    registers.a = memory.read(registers.hl);
-    registers.hl++;
     break;
   }
 
@@ -555,16 +733,6 @@ bool CPU::step() {
     break;
   }
 
-  case 0x28: { // JR Z, r8
-    int8_t offset = static_cast<int8_t>(fetch8());
-
-    if (registers.f & FLAG_Z) {
-      registers.pc += offset;
-    }
-
-    break;
-  }
-
   case 0xC0: { // RET NZ
     if (!(registers.f & FLAG_Z)) {
       uint8_t low = memory.read(registers.sp++);
@@ -575,15 +743,6 @@ bool CPU::step() {
 
     break;
   }
-
-  case 0x2F: { // CPL
-    registers.a = ~registers.a;
-
-    registers.f |= FLAG_N | FLAG_H; // Set N and H, preserve Z and C
-    break;
-  }
-
-  
 
   default:
     std::cerr << "Unknown instruction: 0x" << std::hex << (int)instruction
